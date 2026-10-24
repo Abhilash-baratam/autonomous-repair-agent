@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.agent_worktrees/
+mock_test_repo/
+*.egg-info/
+dist/
+build/

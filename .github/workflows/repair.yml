@@ -1,0 +1,55 @@
+name: Autonomous Test Repair Gate
+
+# Run automatically whenever someone pushes code or creates a Pull Request
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  test-and-repair:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Download your repository into the cloud machine
+    - name: Check out repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # 2. Install Python 3.11 in the cloud
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    # 3. Install all your agent tools and libraries
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e .
+
+    # 4. Run tests. If they fail, set a flag TESTS_FAILED=true
+    - name: Run Pytest Suite
+      id: test_run
+      run: |
+        pytest || echo "TESTS_FAILED=true" >> $GITHUB_ENV
+
+    # 5. If tests failed, run your Autonomous Repair Agent to fix it!
+    - name: Execute Autonomous Repair Agent
+      if: env.TESTS_FAILED == 'true'
+      env:
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      run: |
+        echo "Tests failed! Running Autonomous Repair Agent..."
+        repair-agent --repo . --target-test "pytest" --regression-test "pytest"
+
+    # 6. Save the generated .patch file so developers can download it from GitHub
+    - name: Upload Repair Artifacts
+      if: env.TESTS_FAILED == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: repair-patches-and-reports
+        path: exported_patches/
